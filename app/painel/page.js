@@ -46,23 +46,32 @@ export default function Painel() {
   const [referrals, setReferrals] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  async function fetchData() {
+    const { data } = await supabase
+      .from("referrals")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    setReferrals(data || []);
+    setLoading(false);
+  }
+
   useEffect(() => {
-    async function fetchData() {
-      const { data } = await supabase
-        .from("referrals")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      setReferrals(data || []);
-      setLoading(false);
-    }
-
     fetchData();
   }, []);
 
+  async function updateStatus(id, newStatus) {
+    await supabase
+      .from("referrals")
+      .update({ status: newStatus })
+      .eq("id", id);
+
+    fetchData();
+  }
+
   return (
     <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
-      <h1>Meu Painel</h1>
+      <h1>Meu Painel (Admin)</h1>
 
       {loading && <p>Carregando...</p>}
 
@@ -83,7 +92,7 @@ export default function Painel() {
               <th align="left">Indicado</th>
               <th align="left">WhatsApp</th>
               <th align="left">Status</th>
-              <th align="left">Data</th>
+              <th align="left">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -95,7 +104,38 @@ export default function Painel() {
                   <StatusBadge status={r.status} />
                 </td>
                 <td>
-                  {new Date(r.created_at).toLocaleDateString()}
+                  {r.status === "pendente" && (
+                    <>
+                      <button
+                        onClick={() => updateStatus(r.id, "validado")}
+                        style={{
+                          marginRight: 8,
+                          background: "#28a745",
+                          color: "white",
+                          border: "none",
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Validar
+                      </button>
+
+                      <button
+                        onClick={() => updateStatus(r.id, "cancelado")}
+                        style={{
+                          background: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
