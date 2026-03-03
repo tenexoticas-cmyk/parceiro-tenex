@@ -1,10 +1,7 @@
 export default function Home() {
   return (
     <main style={{ padding: 24, fontFamily: "Arial, sans-serif", maxWidth: 900, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 42, marginBottom: 8 }}>
-        Parceiro Tenex 🚀
-      </h1>
-
+      <h1 style={{ fontSize: 42, marginBottom: 8 }}>Parceiro Tenex 🚀</h1>
       <p style={{ fontSize: 18, opacity: 0.85, marginBottom: 18 }}>
         Indique amigos para a Tenex e acompanhe seus créditos de forma simples.
       </p>
