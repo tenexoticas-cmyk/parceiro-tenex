@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 function money(n) {
@@ -17,6 +17,31 @@ export default function Indicador() {
   const [usages, setUsages] = useState([]);
   const [referrals, setReferrals] = useState([]);
   const [rewards, setRewards] = useState([]);
+
+  // --- NOVO: gerar link automaticamente ---
+  const [baseUrl, setBaseUrl] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBaseUrl(window.location.origin);
+    }
+  }, []);
+
+  const referralLink = useMemo(() => {
+    if (!baseUrl || !whats) return "";
+    return `${baseUrl}/indicar?ref=${encodeURIComponent(whats)}`;
+  }, [baseUrl, whats]);
+
+  async function copyLink() {
+    if (!referralLink) return;
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      setMsg("Link copiado ✅");
+    } catch {
+      setMsg("Não consegui copiar. Copie manualmente.");
+    }
+  }
+  // --- /NOVO ---
 
   const activeCredits = useMemo(() => {
     const now = new Date().toISOString();
@@ -121,8 +146,51 @@ export default function Indicador() {
         {msg ? <div style={{ alignSelf: "center", fontSize: 13, opacity: 0.85 }}>{msg}</div> : null}
       </div>
 
+      {/* NOVO: Link de indicação + Copiar */}
+      {referralLink ? (
+        <div
+          style={{
+            marginTop: 12,
+            border: "1px solid #eee",
+            borderRadius: 14,
+            padding: 14,
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontSize: 12, opacity: 0.75 }}>Seu link de indicação</div>
+            <div style={{ fontWeight: 800, wordBreak: "break-all" }}>{referralLink}</div>
+          </div>
+
+          <button
+            onClick={copyLink}
+            style={{
+              background: "black",
+              color: "white",
+              border: "none",
+              padding: "10px 14px",
+              borderRadius: 12,
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            Copiar link
+          </button>
+        </div>
+      ) : null}
+
       {/* Resumo */}
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginTop: 16 }}>
+      <div
+        style={{
+          display: "grid",
+          gap: 10,
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          marginTop: 16,
+        }}
+      >
         <div style={{ border: "1px solid #eee", borderRadius: 14, padding: 14 }}>
           <div style={{ fontSize: 12, opacity: 0.75 }}>Saldo disponível</div>
           <div style={{ fontSize: 22, fontWeight: 900 }}>{money(balance)}</div>
