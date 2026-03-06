@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 function money(n) {
@@ -18,19 +18,11 @@ export default function Indicador() {
   const [referrals, setReferrals] = useState([]);
   const [rewards, setRewards] = useState([]);
 
-  // --- NOVO: gerar link automaticamente ---
-  const [baseUrl, setBaseUrl] = useState("");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setBaseUrl(window.location.origin);
-    }
-  }, []);
-
   const referralLink = useMemo(() => {
-    if (!baseUrl || !whats) return "";
-    return `${baseUrl}/indicar?ref=${encodeURIComponent(whats)}`;
-  }, [baseUrl, whats]);
+    if (!whats) return "";
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}/indicar?ref=${encodeURIComponent(whats)}`;
+  }, [whats]);
 
   async function copyLink() {
     if (!referralLink) return;
@@ -41,7 +33,6 @@ export default function Indicador() {
       setMsg("Não consegui copiar. Copie manualmente.");
     }
   }
-  // --- /NOVO ---
 
   const activeCredits = useMemo(() => {
     const now = new Date().toISOString();
@@ -60,10 +51,20 @@ export default function Indicador() {
     ).length;
   }, [referrals]);
 
-  const totalRewardsEarned = useMemo(() => Math.floor(validPurchasesCount / 3), [validPurchasesCount]);
+  const totalRewardsEarned = useMemo(
+    () => Math.floor(validPurchasesCount / 3),
+    [validPurchasesCount]
+  );
 
-  const rewardsDelivered = useMemo(() => (rewards || []).filter((r) => r.delivered).length, [rewards]);
-  const rewardsPending = useMemo(() => totalRewardsEarned - rewardsDelivered, [totalRewardsEarned, rewardsDelivered]);
+  const rewardsDelivered = useMemo(
+    () => (rewards || []).filter((r) => r.delivered).length,
+    [rewards]
+  );
+
+  const rewardsPending = useMemo(
+    () => totalRewardsEarned - rewardsDelivered,
+    [totalRewardsEarned, rewardsDelivered]
+  );
 
   async function load() {
     if (!whats.trim()) return;
@@ -71,28 +72,24 @@ export default function Indicador() {
     setLoading(true);
     setMsg("");
 
-    // créditos
     const { data: credData, error: credErr } = await supabase
       .from("credits")
       .select("id, amount, remaining_amount, expires_at, created_at, referral_id")
       .eq("user_whatsapp", whats)
       .order("created_at", { ascending: true });
 
-    // usos
     const { data: useData, error: useErr } = await supabase
       .from("credit_usages")
       .select("id, used_amount, sale_value, product_type, payment_type, created_at, breakdown")
       .eq("user_whatsapp", whats)
       .order("created_at", { ascending: false });
 
-    // indicações (as que ele indicou)
     const { data: refData, error: refErr } = await supabase
       .from("referrals")
       .select("id, referred_name, referred_whatsapp, status, purchase_value, created_at")
       .eq("referrer_whatsapp", whats)
       .order("created_at", { ascending: false });
 
-    // prêmios (rewards ledger)
     const { data: rewData, error: rewErr } = await supabase
       .from("rewards")
       .select("id, reward_type, referral_count, delivered, created_at")
@@ -146,7 +143,6 @@ export default function Indicador() {
         {msg ? <div style={{ alignSelf: "center", fontSize: 13, opacity: 0.85 }}>{msg}</div> : null}
       </div>
 
-      {/* NOVO: Link de indicação + Copiar */}
       {referralLink ? (
         <div
           style={{
@@ -182,7 +178,6 @@ export default function Indicador() {
         </div>
       ) : null}
 
-      {/* Resumo */}
       <div
         style={{
           display: "grid",
@@ -218,7 +213,6 @@ export default function Indicador() {
         </div>
       </div>
 
-      {/* Regras */}
       <div style={{ marginTop: 18, border: "1px solid #eee", borderRadius: 14, padding: 14 }}>
         <h2 style={{ margin: 0, fontSize: 16 }}>Regras do crédito</h2>
         <ul style={{ marginTop: 10, lineHeight: 1.7 }}>
@@ -230,7 +224,6 @@ export default function Indicador() {
         </ul>
       </div>
 
-      {/* Créditos ativos */}
       <div style={{ marginTop: 18 }}>
         <h2 style={{ fontSize: 16, marginBottom: 8 }}>Créditos ativos</h2>
         {activeCredits.length === 0 ? (
@@ -257,7 +250,6 @@ export default function Indicador() {
         )}
       </div>
 
-      {/* Histórico de usos */}
       <div style={{ marginTop: 18 }}>
         <h2 style={{ fontSize: 16, marginBottom: 8 }}>Histórico de uso</h2>
         {usages.length === 0 ? (
@@ -288,7 +280,6 @@ export default function Indicador() {
         )}
       </div>
 
-      {/* Indicações */}
       <div style={{ marginTop: 18 }}>
         <h2 style={{ fontSize: 16, marginBottom: 8 }}>Indicações</h2>
         {referrals.length === 0 ? (
