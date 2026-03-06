@@ -21,7 +21,7 @@ export default function Indicador() {
   const referralLink = useMemo(() => {
     if (!whats) return "";
     if (typeof window === "undefined") return "";
-    return `${window.location.origin}/indicar?ref=${encodeURIComponent(whats)}`;
+    return `${window.location.origin}/i/${encodeURIComponent(whats)}`;
   }, [whats]);
 
   const whatsappShareLink = useMemo(() => {
