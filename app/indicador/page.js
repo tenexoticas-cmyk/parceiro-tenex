@@ -24,6 +24,21 @@ export default function Indicador() {
     return `${window.location.origin}/indicar?ref=${encodeURIComponent(whats)}`;
   }, [whats]);
 
+  const whatsappShareLink = useMemo(() => {
+    if (!referralLink) return "";
+    const text = `Seu link de indicação Tenex 👇
+
+${referralLink}
+
+Compartilhe com seus amigos. Quando eles comprarem, você ganha créditos para usar na loja.`;
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }, [referralLink]);
+
+  const qrCodeUrl = useMemo(() => {
+    if (!referralLink) return "";
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(referralLink)}`;
+  }, [referralLink]);
+
   async function copyLink() {
     if (!referralLink) return;
     try {
@@ -146,35 +161,72 @@ export default function Indicador() {
       {referralLink ? (
         <div
           style={{
-            marginTop: 12,
+            marginTop: 16,
             border: "1px solid #eee",
             borderRadius: 14,
-            padding: 14,
-            display: "flex",
-            gap: 10,
+            padding: 16,
+            display: "grid",
+            gap: 16,
+            gridTemplateColumns: "1.5fr 260px",
             alignItems: "center",
-            flexWrap: "wrap",
           }}
         >
-          <div style={{ flex: 1, minWidth: 260 }}>
+          <div>
             <div style={{ fontSize: 12, opacity: 0.75 }}>Seu link de indicação</div>
-            <div style={{ fontWeight: 800, wordBreak: "break-all" }}>{referralLink}</div>
+            <div style={{ fontWeight: 800, wordBreak: "break-all", marginTop: 6 }}>
+              {referralLink}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+              <button
+                onClick={copyLink}
+                style={{
+                  background: "black",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  fontWeight: 900,
+                }}
+              >
+                Copiar link
+              </button>
+
+              <a
+                href={whatsappShareLink}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  background: "#25D366",
+                  color: "white",
+                  textDecoration: "none",
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  fontWeight: 900,
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                Compartilhar no WhatsApp
+              </a>
+            </div>
           </div>
 
-          <button
-            onClick={copyLink}
-            style={{
-              background: "black",
-              color: "white",
-              border: "none",
-              padding: "10px 14px",
-              borderRadius: 12,
-              cursor: "pointer",
-              fontWeight: 900,
-            }}
-          >
-            Copiar link
-          </button>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 8 }}>QR Code do link</div>
+            <img
+              src={qrCodeUrl}
+              alt="QR Code do link de indicação"
+              style={{
+                width: 220,
+                height: 220,
+                maxWidth: "100%",
+                border: "1px solid #eee",
+                borderRadius: 12,
+              }}
+            />
+          </div>
         </div>
       ) : null}
 
