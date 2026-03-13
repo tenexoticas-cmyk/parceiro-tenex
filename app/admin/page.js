@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { checkAdmin } from "../../lib/checkAdmin";
 
 function StatusBadge({ status }) {
   let bg = "#eee";
@@ -72,7 +73,6 @@ function Modal({ open, title, children, onClose }) {
           <button
             onClick={onClose}
             style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 18 }}
-            aria-label="Fechar"
           >
             ✕
           </button>
@@ -84,16 +84,39 @@ function Modal({ open, title, children, onClose }) {
 }
 
 export default function Painel() {
+
+  // 🔐 proteção de admin
+  const [authorized, setAuthorized] = useState(false);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    async function verify() {
+      const ok = await checkAdmin();
+
+      if (!ok) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setAuthorized(true);
+      setLoadingAuth(false);
+    }
+
+    verify();
+  }, []);
+
+  if (loadingAuth) return <p style={{ padding: 24 }}>Verificando acesso...</p>;
+  if (!authorized) return null;
+
   const [referrals, setReferrals] = useState([]);
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // modal validar
   const [openModal, setOpenModal] = useState(false);
   const [selected, setSelected] = useState(null);
   const [purchaseValue, setPurchaseValue] = useState("");
-  const [productType, setProductType] = useState("geral"); // geral | contato
-  const [paymentType, setPaymentType] = useState("avista"); // avista | prazo
+  const [productType, setProductType] = useState("geral");
+  const [paymentType, setPaymentType] = useState("avista");
   const [msg, setMsg] = useState("");
 
   async function fetchAll() {
@@ -149,7 +172,6 @@ export default function Painel() {
 
     setMsg("Validando...");
 
-    // 1) atualiza a indicação
     const { error: updErr } = await supabase
       .from("referrals")
       .update({
@@ -161,61 +183,50 @@ export default function Painel() {
       .eq("id", selected.id);
 
     if (updErr) {
-      setMsg("Erro ao validar. Tente novamente.");
+      setMsg("Erro ao validar.");
       return;
     }
 
-    // 2) cria crédito = 10% do valor
     const creditAmount = Math.round(val * 0.1 * 100) / 100;
     const expires = new Date();
     expires.setDate(expires.getDate() + 365);
 
-    const { error: credErr } = await supabase.from("credits").insert([
+    await supabase.from("credits").insert([
       {
         user_whatsapp: selected.referrer_whatsapp,
         amount: creditAmount,
         referral_id: selected.id,
         expires_at: expires.toISOString(),
-        used: false,
       },
     ]);
 
-    if (credErr) {
-      setMsg("Validou, mas erro ao gerar crédito. (A gente corrige já)");
-      await fetchAll();
-      return;
-    }
-
-    // 3) conta quantas compras válidas esse indicador já tem (validado + purchase_value > 0)
-    const { data: countData, error: cntErr } = await supabase
+    const { data } = await supabase
       .from("referrals")
-      .select("id, purchase_value", { count: "exact" })
+      .select("*")
       .eq("referrer_whatsapp", selected.referrer_whatsapp)
       .eq("status", "validado");
 
-    if (!cntErr) {
-      const validPurchases = (countData || []).filter((r) => Number(r.purchase_value || 0) > 0).length;
+    const validPurchases = (data || []).filter(
+      (r) => Number(r.purchase_value || 0) > 0
+    ).length;
 
-      // 4) a cada 3 compras válidas -> cria reward
-      if (validPurchases > 0 && validPurchases % 3 === 0) {
-        await supabase.from("rewards").insert([
-          {
-            user_whatsapp: selected.referrer_whatsapp,
-            reward_type: "oculos_exclusivo_tenex",
-            referral_count: validPurchases,
-            delivered: false,
-          },
-        ]);
-      }
+    if (validPurchases > 0 && validPurchases % 3 === 0) {
+      await supabase.from("rewards").insert([
+        {
+          user_whatsapp: selected.referrer_whatsapp,
+          reward_type: "oculos_exclusivo_tenex",
+          referral_count: validPurchases,
+          delivered: false,
+        },
+      ]);
     }
 
-    setMsg("Validado ✅ Crédito gerado.");
     await fetchAll();
     closeModal();
   }
 
   const pendingRewards = useMemo(
-    () => (rewards || []).filter((r) => r.reward_type === "oculos_exclusivo_tenex" && !r.delivered),
+    () => (rewards || []).filter((r) => !r.delivered),
     [rewards]
   );
 
@@ -232,66 +243,6 @@ export default function Painel() {
 
       {!loading && (
         <>
-          {/* ALERTAS DE PRÊMIO */}
-          <div
-            style={{
-              marginTop: 14,
-              padding: 14,
-              border: "1px solid #eee",
-              borderRadius: 12,
-              background: pendingRewards.length ? "#f7fff7" : "#fafafa",
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 16 }}>Prêmios pendentes</h2>
-
-            {pendingRewards.length === 0 ? (
-              <p style={{ marginTop: 8, marginBottom: 0, opacity: 0.8 }}>
-                Nenhum prêmio pendente no momento.
-              </p>
-            ) : (
-              <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-                {pendingRewards.map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      alignItems: "center",
-                      padding: 10,
-                      borderRadius: 10,
-                      border: "1px solid #e6ffe6",
-                      background: "white",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 800 }}>🎁 Óculos Exclusivo Tenex</div>
-                      <div style={{ fontSize: 13, opacity: 0.8 }}>
-                        Whats: {r.user_whatsapp} • Atingiu {r.referral_count} compras válidas
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => markRewardDelivered(r.id)}
-                      style={{
-                        background: "black",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 12px",
-                        borderRadius: 10,
-                        cursor: "pointer",
-                        fontWeight: 800,
-                      }}
-                    >
-                      Marcar como entregue
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* TABELA DE INDICAÇÕES */}
           <h2 style={{ marginTop: 22, fontSize: 16 }}>Indicações</h2>
 
           {referrals.length === 0 ? (
@@ -313,50 +264,27 @@ export default function Painel() {
                   <tr key={r.id} style={{ borderTop: "1px solid #eee" }}>
                     <td>{r.referred_name}</td>
                     <td>{r.referred_whatsapp}</td>
-                    <td style={{ fontSize: 13, opacity: 0.85 }}>
-                      {r.referrer_name} <br />
+                    <td>
+                      {r.referrer_name}
+                      <br />
                       {r.referrer_whatsapp}
                     </td>
                     <td>
                       <StatusBadge status={r.status} />
                     </td>
-                    <td style={{ fontSize: 13, opacity: 0.85 }}>
-                      {r.purchase_value ? `R$ ${Number(r.purchase_value).toFixed(2)}` : "-"}
-                      <br />
-                      {r.product_type ? `Tipo: ${r.product_type}` : ""}
-                      {r.payment_type ? ` • Pgto: ${r.payment_type}` : ""}
+                    <td>
+                      {r.purchase_value
+                        ? `R$ ${Number(r.purchase_value).toFixed(2)}`
+                        : "-"}
                     </td>
                     <td>
                       {r.status === "pendente" && (
                         <>
-                          <button
-                            onClick={() => openValidateModal(r)}
-                            style={{
-                              marginRight: 8,
-                              background: "#28a745",
-                              color: "white",
-                              border: "none",
-                              padding: "6px 10px",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontWeight: 800,
-                            }}
-                          >
+                          <button onClick={() => openValidateModal(r)}>
                             Validar
                           </button>
 
-                          <button
-                            onClick={() => cancelReferral(r.id)}
-                            style={{
-                              background: "#dc3545",
-                              color: "white",
-                              border: "none",
-                              padding: "6px 10px",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontWeight: 800,
-                            }}
-                          >
+                          <button onClick={() => cancelReferral(r.id)}>
                             Cancelar
                           </button>
                         </>
@@ -370,73 +298,17 @@ export default function Painel() {
         </>
       )}
 
-      {/* MODAL VALIDAR */}
-      <Modal
-        open={openModal}
-        title="Validar indicação (gera crédito + conta para prêmio)"
-        onClose={closeModal}
-      >
+      <Modal open={openModal} title="Validar indicação" onClose={closeModal}>
         <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontSize: 13, opacity: 0.85 }}>
-            Indicador: <b>{selected?.referrer_name}</b> ({selected?.referrer_whatsapp})<br />
-            Indicado: <b>{selected?.referred_name}</b>
-          </div>
+          <input
+            value={purchaseValue}
+            onChange={(e) => setPurchaseValue(e.target.value)}
+            placeholder="Valor da compra"
+          />
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontWeight: 700 }}>Valor da compra (R$)</span>
-            <input
-              value={purchaseValue}
-              onChange={(e) => setPurchaseValue(e.target.value)}
-              placeholder="Ex: 799,90"
-              style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-            />
-          </label>
+          <button onClick={validateReferral}>Confirmar validação</button>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontWeight: 700 }}>Tipo de produto</span>
-            <select
-              value={productType}
-              onChange={(e) => setProductType(e.target.value)}
-              style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-            >
-              <option value="geral">Geral (armação/solar/lentes grau)</option>
-              <option value="contato">Lentes de contato</option>
-            </select>
-          </label>
-
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ fontWeight: 700 }}>Forma de pagamento</span>
-            <select
-              value={paymentType}
-              onChange={(e) => setPaymentType(e.target.value)}
-              style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
-            >
-              <option value="avista">À vista</option>
-              <option value="prazo">Parcelado</option>
-            </select>
-          </label>
-
-          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>
-            Crédito gerado: <b>10%</b> do valor da compra • Validade: <b>365 dias</b>
-          </div>
-
-          <button
-            onClick={validateReferral}
-            style={{
-              background: "black",
-              color: "white",
-              border: "none",
-              padding: "10px 12px",
-              borderRadius: 12,
-              cursor: "pointer",
-              fontWeight: 900,
-              marginTop: 6,
-            }}
-          >
-            Confirmar validação
-          </button>
-
-          {msg ? <div style={{ marginTop: 6, fontSize: 13 }}>{msg}</div> : null}
+          {msg && <div>{msg}</div>}
         </div>
       </Modal>
     </main>
