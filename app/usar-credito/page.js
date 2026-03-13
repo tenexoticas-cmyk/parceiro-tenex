@@ -1,16 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { checkAdmin } from "../../lib/checkAdmin";
 
 function pctLimit(productType, paymentType) {
-  // geral: 35% avista | 25% prazo
-  // contato: 15% avista | 8% prazo
   if (productType === "contato") return paymentType === "avista" ? 0.15 : 0.08;
   return paymentType === "avista" ? 0.35 : 0.25;
 }
 
 export default function UsarCredito() {
+
+  // 🔐 PROTEÇÃO ADMIN
+  const [authorized, setAuthorized] = useState(false);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    async function verify() {
+      const ok = await checkAdmin();
+
+      if (!ok) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setAuthorized(true);
+      setLoadingAuth(false);
+    }
+
+    verify();
+  }, []);
+
+  if (loadingAuth) return <p style={{ padding: 24 }}>Verificando acesso...</p>;
+  if (!authorized) return null;
+
   const [whats, setWhats] = useState("");
   const [saleValue, setSaleValue] = useState("");
   const [productType, setProductType] = useState("geral");
@@ -71,14 +94,12 @@ export default function UsarCredito() {
     let remainingToUse = canUseMax;
     const breakdown = [];
 
-    // Abate FIFO (mais antigos primeiro)
     for (const c of credits) {
       if (remainingToUse <= 0) break;
 
       const cRemain = Number(c.remaining_amount || 0);
       const take = Math.min(cRemain, remainingToUse);
 
-      // update crédito
       const { error: updErr } = await supabase
         .from("credits")
         .update({ remaining_amount: Math.round((cRemain - take) * 100) / 100 })
@@ -86,7 +107,7 @@ export default function UsarCredito() {
 
       if (updErr) {
         setLoading(false);
-        setMsg("Erro ao abater crédito. Tente novamente.");
+        setMsg("Erro ao abater crédito.");
         return;
       }
 
@@ -94,7 +115,6 @@ export default function UsarCredito() {
       remainingToUse = Math.round((remainingToUse - take) * 100) / 100;
     }
 
-    // registrar baixa
     const { error: insErr } = await supabase.from("credit_usages").insert([
       {
         user_whatsapp: whats,
@@ -109,7 +129,7 @@ export default function UsarCredito() {
     setLoading(false);
 
     if (insErr) {
-      setMsg("Abateu, mas falhou ao registrar histórico. (A gente ajusta)");
+      setMsg("Abateu, mas falhou ao registrar histórico.");
       await loadCredits();
       return;
     }
@@ -123,6 +143,7 @@ export default function UsarCredito() {
       <h1>Simular e Aplicar Crédito</h1>
 
       <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+
         <input
           placeholder="WhatsApp do indicador (somente números)"
           value={whats}
@@ -138,6 +159,7 @@ export default function UsarCredito() {
         />
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+
           <select
             value={productType}
             onChange={(e) => setProductType(e.target.value)}
@@ -171,6 +193,7 @@ export default function UsarCredito() {
           >
             Buscar saldo
           </button>
+
         </div>
 
         <div style={{ marginTop: 8, padding: 14, border: "1px solid #eee", borderRadius: 12 }}>
@@ -196,10 +219,12 @@ export default function UsarCredito() {
           </button>
 
           {msg ? <div style={{ marginTop: 10 }}>{msg}</div> : null}
+
         </div>
 
         <div style={{ marginTop: 8 }}>
           <h3 style={{ marginBottom: 8 }}>Créditos ativos (FIFO)</h3>
+
           {credits.length === 0 ? (
             <p style={{ opacity: 0.8 }}>Nenhum crédito carregado.</p>
           ) : (
@@ -212,6 +237,7 @@ export default function UsarCredito() {
               ))}
             </ul>
           )}
+
         </div>
       </div>
     </main>
