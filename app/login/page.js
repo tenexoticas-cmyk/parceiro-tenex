@@ -7,22 +7,29 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin(e) {
     e.preventDefault();
+    setLoading(true);
     setMsg("Entrando...");
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
+    if (error || !data?.session) {
+      setLoading(false);
       setMsg("E-mail ou senha inválidos.");
       return;
     }
 
-    window.location.href = "/admin";
+    setMsg("Login realizado ✅");
+
+    setTimeout(() => {
+      window.location.href = "/admin";
+    }, 800);
   }
 
   return (
@@ -50,6 +57,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
+          disabled={loading}
           style={{
             background: "black",
             color: "white",
@@ -60,7 +68,7 @@ export default function LoginPage() {
             cursor: "pointer",
           }}
         >
-          Entrar
+          {loading ? "Entrando..." : "Entrar"}
         </button>
 
         {msg ? <p>{msg}</p> : null}
