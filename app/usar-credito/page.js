@@ -10,10 +10,19 @@ function pctLimit(productType, paymentType) {
 }
 
 export default function UsarCredito() {
-
-  // 🔐 PROTEÇÃO ADMIN
+  // proteção admin
   const [authorized, setAuthorized] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
+
+  // estados da página
+  const [whats, setWhats] = useState("");
+  const [saleValue, setSaleValue] = useState("");
+  const [productType, setProductType] = useState("geral");
+  const [paymentType, setPaymentType] = useState("avista");
+
+  const [credits, setCredits] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function verify() {
@@ -31,22 +40,16 @@ export default function UsarCredito() {
     verify();
   }, []);
 
-  if (loadingAuth) return <p style={{ padding: 24 }}>Verificando acesso...</p>;
-  if (!authorized) return null;
-
-  const [whats, setWhats] = useState("");
-  const [saleValue, setSaleValue] = useState("");
-  const [productType, setProductType] = useState("geral");
-  const [paymentType, setPaymentType] = useState("avista");
-
-  const [credits, setCredits] = useState([]);
-  const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const sale = useMemo(() => Number(String(saleValue).replace(",", ".")) || 0, [saleValue]);
+  const sale = useMemo(
+    () => Number(String(saleValue).replace(",", ".")) || 0,
+    [saleValue]
+  );
 
   const availableBalance = useMemo(() => {
-    return (credits || []).reduce((sum, c) => sum + Number(c.remaining_amount || 0), 0);
+    return (credits || []).reduce(
+      (sum, c) => sum + Number(c.remaining_amount || 0),
+      0
+    );
   }, [credits]);
 
   const ruleMax = useMemo(() => {
@@ -79,15 +82,28 @@ export default function UsarCredito() {
     }
 
     setCredits(data || []);
-    if (!data || data.length === 0) setMsg("Sem créditos disponíveis para este WhatsApp.");
+    if (!data || data.length === 0) {
+      setMsg("Sem créditos disponíveis para este WhatsApp.");
+    }
   }
 
   async function applyMaxCredit() {
     setMsg("");
 
-    if (!whats.trim()) return setMsg("Informe o WhatsApp do indicador.");
-    if (!sale || sale <= 0) return setMsg("Informe o valor da venda.");
-    if (canUseMax <= 0) return setMsg("Nenhum crédito pode ser usado nesta venda.");
+    if (!whats.trim()) {
+      setMsg("Informe o WhatsApp do indicador.");
+      return;
+    }
+
+    if (!sale || sale <= 0) {
+      setMsg("Informe o valor da venda.");
+      return;
+    }
+
+    if (canUseMax <= 0) {
+      setMsg("Nenhum crédito pode ser usado nesta venda.");
+      return;
+    }
 
     setLoading(true);
 
@@ -102,7 +118,9 @@ export default function UsarCredito() {
 
       const { error: updErr } = await supabase
         .from("credits")
-        .update({ remaining_amount: Math.round((cRemain - take) * 100) / 100 })
+        .update({
+          remaining_amount: Math.round((cRemain - take) * 100) / 100,
+        })
         .eq("id", c.id);
 
       if (updErr) {
@@ -111,7 +129,11 @@ export default function UsarCredito() {
         return;
       }
 
-      breakdown.push({ credit_id: c.id, used: Math.round(take * 100) / 100 });
+      breakdown.push({
+        credit_id: c.id,
+        used: Math.round(take * 100) / 100,
+      });
+
       remainingToUse = Math.round((remainingToUse - take) * 100) / 100;
     }
 
@@ -138,12 +160,19 @@ export default function UsarCredito() {
     await loadCredits();
   }
 
+  if (loadingAuth) {
+    return <p style={{ padding: 24 }}>Verificando acesso...</p>;
+  }
+
+  if (!authorized) {
+    return null;
+  }
+
   return (
     <main style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
       <h1>Simular e Aplicar Crédito</h1>
 
       <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-
         <input
           placeholder="WhatsApp do indicador (somente números)"
           value={whats}
@@ -159,7 +188,6 @@ export default function UsarCredito() {
         />
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-
           <select
             value={productType}
             onChange={(e) => setProductType(e.target.value)}
@@ -193,10 +221,16 @@ export default function UsarCredito() {
           >
             Buscar saldo
           </button>
-
         </div>
 
-        <div style={{ marginTop: 8, padding: 14, border: "1px solid #eee", borderRadius: 12 }}>
+        <div
+          style={{
+            marginTop: 8,
+            padding: 14,
+            border: "1px solid #eee",
+            borderRadius: 12,
+          }}
+        >
           <div><b>Saldo disponível:</b> R$ {availableBalance.toFixed(2)}</div>
           <div><b>Máximo pela regra:</b> R$ {ruleMax.toFixed(2)}</div>
           <div><b>Pode usar nesta venda:</b> R$ {canUseMax.toFixed(2)}</div>
@@ -219,7 +253,6 @@ export default function UsarCredito() {
           </button>
 
           {msg ? <div style={{ marginTop: 10 }}>{msg}</div> : null}
-
         </div>
 
         <div style={{ marginTop: 8 }}>
@@ -237,7 +270,6 @@ export default function UsarCredito() {
               ))}
             </ul>
           )}
-
         </div>
       </div>
     </main>
