@@ -174,7 +174,84 @@ export default function PainelAdmin() {
     await fetchAll();
   }
 
-  async function validateReferral() {
+async function validateReferral() {
+  if (!selected) return;
+
+  const val = Number(String(purchaseValue).replace(",", "."));
+  if (!val || val <= 0) {
+    setMsg("Informe um valor de compra maior que zero.");
+    return;
+  }
+
+  setMsg("Validando...");
+
+  // 1. Atualiza a indicação
+  const { error: updErr } = await supabase
+    .from("referrals")
+    .update({
+      status: "validado",
+      purchase_value: val,
+      product_type: productType,
+      payment_type: paymentType,
+    })
+    .eq("id", selected.id);
+
+  if (updErr) {
+    setMsg("Erro ao validar indicação ❌");
+    return;
+  }
+
+  // 2. Calcula crédito
+  const creditAmount = Math.round(val * 0.1 * 100) / 100;
+
+  const expires = new Date();
+  expires.setDate(expires.getDate() + 365);
+
+  // 3. Tenta criar crédito (AGORA COM TRATAMENTO)
+  const { error: creditErr } = await supabase.from("credits").insert([
+    {
+      user_whatsapp: selected.referrer_whatsapp,
+      amount: creditAmount,
+      remaining_amount: creditAmount,
+      referral_id: selected.id,
+      expires_at: expires.toISOString(),
+      used: false,
+    },
+  ]);
+
+  if (creditErr) {
+    console.error("Erro ao gerar crédito:", creditErr);
+    setMsg("Validou, mas erro ao gerar crédito ❌");
+    return;
+  }
+
+  // 4. Verifica recompensa (a cada 3 indicações)
+  const { data } = await supabase
+    .from("referrals")
+    .select("*")
+    .eq("referrer_whatsapp", selected.referrer_whatsapp)
+    .eq("status", "validado");
+
+  const validPurchases = (data || []).filter(
+    (r) => Number(r.purchase_value || 0) > 0
+  ).length;
+
+  if (validPurchases > 0 && validPurchases % 3 === 0) {
+    await supabase.from("rewards").insert([
+      {
+        user_whatsapp: selected.referrer_whatsapp,
+        reward_type: "oculos_exclusivo_tenex",
+        referral_count: validPurchases,
+        delivered: false,
+      },
+    ]);
+  }
+
+  setMsg("Indicação validada e crédito gerado com sucesso ✅");
+
+  await fetchAll();
+  closeModal();
+}
     if (!selected) return;
 
     const val = Number(String(purchaseValue).replace(",", "."));
