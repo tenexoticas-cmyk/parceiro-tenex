@@ -90,25 +90,25 @@ Compartilhe com seus amigos. Quando eles comprarem, você ganha créditos para u
     const { data: credData, error: credErr } = await supabase
       .from("credits")
       .select("id, amount, remaining_amount, expires_at, created_at, referral_id")
-      .eq("user_whatsapp", whats)
+      .eq("user_whatsapp", whats.replace(/\D/g, ""))
       .order("created_at", { ascending: true });
 
     const { data: useData, error: useErr } = await supabase
       .from("credit_usages")
       .select("id, used_amount, sale_value, product_type, payment_type, created_at, breakdown")
-      .eq("user_whatsapp", whats)
+      .eq("user_whatsapp", whats.replace(/\D/g, ""))
       .order("created_at", { ascending: false });
 
     const { data: refData, error: refErr } = await supabase
       .from("referrals")
       .select("id, referred_name, referred_whatsapp, status, purchase_value, created_at")
-      .eq("referrer_whatsapp", whats)
+      .eq("user_whatsapp", whats.replace(/\D/g, ""))
       .order("created_at", { ascending: false });
 
     const { data: rewData, error: rewErr } = await supabase
       .from("rewards")
       .select("id, reward_type, referral_count, delivered, created_at")
-      .eq("user_whatsapp", whats)
+      .eq("user_whatsapp", whats.replace(/\D/g, ""))
       .order("created_at", { ascending: false });
 
     setLoading(false);
