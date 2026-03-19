@@ -183,7 +183,7 @@ async function validateReferral() {
     return;
   }
 
-  setMsg("Validando...");
+  async function validar(...) {
 
   // 1. Atualiza a indicação
   const { error: updErr } = await supabase
@@ -260,7 +260,7 @@ async function validateReferral() {
       return;
     }
 
-    setMsg("Validando...");
+    async function validar(...) {
 
     const { error: updErr } = await supabase
       .from("referrals")
